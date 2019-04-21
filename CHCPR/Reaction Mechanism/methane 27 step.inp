@@ -1,0 +1,47 @@
+ELEMENTS  O  H  C  N END
+SPECIES CH4  O2  CO2  H2O  CO  H2  HO2  H  OH  O  CH3  H2O2  CH2O  HCO  CH3O  N2 END
+
+REACTIONS
+H+O2=O+OH 			8.30000E+13	 0	 	14413
+O+H2=H+OH  		5.00000E+04  	2.7  		6290 
+OH+H2=H+H2O    		2.16E+08  		1.5  		3430 
+OH+OH=O+H2O    		3.57E+04  		2.4  		-2110 
+H+O2+M=HO2+M    	2.80000E+18  	-0.86  	0 
+ CO/0.75/ CO2/1.5/  
+H+HO2=2OH     		1.34000E+14  	0.0  		635 
+H+HO2=O2+H2    		2.80E+13  		0  		1068 
+OH+HO2=O2+H2O   	2.90E+13  		0  		-500 
+OH+CO=H+CO2    		4.76E+07  		1.2  		70 
+H+CH3+M=CH4+M	 	1.27E+16  		-0.6  	383  
+  CH4/3/ CO/1.5/  CO2/2/  H2/2/  H2O/6/ 
+H+CH4=CH3+H2    	6.60E+08  		1.6  		10840 
+OH+CH4=CH3+H2O    	1.00E+08  		1.6  		3120 
+O+CH3=H+CH2O    	8.43E+13  		0  		0 
+H+CH2O=HCO+H2    	2.30E+10  		1.1  		3275 
+OH+CH2O=HCO+H2O    	3.43E+09  		1.2  		-447 
+H+HCO=H2+CO    		7.34E+13  		0  		0 
+HCO+M=H+CO+M    	1.87E+17  		-1.0  	17000 
+CH3+O2=O+CH3O      	2.68000E+13  	0  		28800 
+H+CH3O=H2+CH2O      	2.0000E+13  	0  		0 
+H+CH2O+M=CH3O+M	 	5.40000E+11  	0.5  		2600  
+CH4/2/  CO/1.5/  CO2/2/  H2/2/  H2O/6/
+2HO2=O2+H2O2    	1.30E+11  		0  		-1630 
+2HO2=O2+H2O2    	4.20E+14  		0  		12000  
+2OH+M=H2O2+M	  	7.40E+13  		-0.4  	0  
+CH4/2/  CO/1.5/  CO2/2/  H2/2/  H2O/6/ 
+OH+H2O2=HO2+H2O    	1.75E+12  		0  		320 
+OH+H2O2=HO2+H2O    	5.80E+14  		0  		9560
+H+OH+M=H2O+M      	2.20000E+22  	-2.00  	0 
+H2/0.73/  H2O/3.65/  CH4/2.0/
+H+H+M=H2+M      	1.00E+18  		-1  		0  
+H2/0.0/  H2O/0.0/  CH4/2.0/  CO2/0.0/ 
+END
+
+
+GLOBAL
+CH4+2O2+2N2=CO2+2H2O+2N2
+CH4/1/
+O2/0.21/N2/0.79/
+END
+
+

@@ -1,0 +1,9 @@
+ELEMENTS  H   O   N  END
+
+SPECIES H2  O2  OH  N2 END
+
+REACTIONS
+H2+O2=OH+OH                             1.9E14    0.0    43330.729
+
+END
+

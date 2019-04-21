@@ -1,0 +1,5 @@
+Velocity=8.71149313 m/s
+Temperature=1215.417693 K
+Pressure=1 bar
+MOLE Fraction X_i = [0.125843184;0.026189357;0.095630741;0.004662982;0.002995971;7.80146e-05;9.91299e-06;0.1370427;0.607547138];
+<<serially according to chem.inp>>

@@ -1,0 +1,93 @@
+function [Y_i,M_i,vr,vp,Arf_k,nf_k,Ef_k,a,temp,reaction,react_matrix,prod_matrix,rev,third_body,third_body_matrix,...
+reaction_order_matrix,reverse_reaction_order_matrix,no_of_reactions] = reactioninputmulti()
+
+
+%% if INPUT is PHI phi_on=1 else 0 
+phi_on=0;
+if phi_on==1
+%% Load reaction mechanism file
+[elements,spcs,reaction,atomic_mass,unbalanced_react_matrix,...
+unbalanced_prod_matrix,rev,third_body,third_body_matrix,...
+reaction_order_matrix,reverse_reaction_order_matrix,global_reactants,...
+fuel_matrix,oxidizer_matrix,oxidizer_divide]=rxndata;
+
+%% Equivalence Ratio
+phi=1.2;
+X_i=equivalance_ratio(global_reactants,fuel_matrix,oxidizer_matrix,phi,oxidizer_divide);
+X_i=X_i';
+else
+%% Load reaction mechanism file  
+[elements,spcs,reaction,atomic_mass,unbalanced_react_matrix,...
+unbalanced_prod_matrix,rev,third_body,third_body_matrix,...
+reaction_order_matrix,reverse_reaction_order_matrix]=rxndata;
+
+%% Mass fraction of the species
+%According to species arrangement in chem.inp file
+%  Y_i=[2/62;32/62;0.0;28/62];  
+% Y_i=[0.0283;0.22642;0;0.74528];
+% Y_i=[0.029960;0;0.149396;0;0;0.820643];  % CH4 validation
+ % X_i = [0;0;.21;0;0;0;0;0;.79]
+% MWmix=sum(X_i.*M_i);
+% Y_i=X_i.*M_i./MWmix
+X_i = [7.15-02;1.21e-02;2.54e-03;1.50e-03;1.43e-02;7.80146e-05;9.91299e-06;0.1370427;0.607547138];
+MWmix=sum(X_i.*M_i);
+Y_i=X_i.*M_i./MWmix;
+% Y_i=[0.005;0;0.00018;0;0;0;0;0.25265;0.74217];
+% Y_i = [0;0;2.3292e-001;0;0;0;0;0;7.6708e-001]
+% Y_i=[0.0028;0;0.00034;0;0;0;0;0.2557;0.7381];
+
+end
+
+Arf_k=[reaction(:).Arf]'
+nf_k=[reaction(:).nf]';
+Ef_k=[reaction(:).Ef]'.*4.184;
+
+%% Load thermodynamic file
+[a,temp,element_composition]=thermodat(spcs,elements);
+
+%% Balancing Chemical Reaction
+[react_matrix,prod_matrix]= stoic_balance(unbalanced_react_matrix,unbalanced_prod_matrix,element_composition);
+disp('Balancing Done')
+
+%% Calculate Atomic Weight of Species
+M_i=element_composition*atomic_mass/1000;
+[no_of_reactions,no_of_species]=size(react_matrix);
+%% Managing Stoichiometric Matrix for reactants and products
+order_check=reaction_order_matrix==0;
+vr=zeros(size(react_matrix));
+for i=1: no_of_reactions
+    vr(i,:)=react_matrix(i,:);
+    for j=1:no_of_species
+    if order_check(i,j)==0
+    vr(i,j)=reaction_order_matrix(i,j);
+    end
+    end
+end
+order_check=reverse_reaction_order_matrix==0;
+vp=zeros(size(prod_matrix));
+for i=1: no_of_reactions
+    vp(i,:)=prod_matrix(i,:);
+    for j=1:no_of_species
+    if order_check(i,j)==0
+    vp(i,j)=reverse_reaction_order_matrix(i,j);
+    end
+    end
+end
+    
+vr=vr';     %% matrix of forward reaction order
+vp=vp';     %% matrix of reverse reaction order
+
+
+% Y_i=[2/46;16/46;0;28/46];
+% Y_i=[2/62;32/62;0;28/62];
+% Y_i=[2/46;0;16/46;0;0;28/46];
+%% Convert to mass fraction 
+if phi_on==1
+ MWmix=sum(X_i.*M_i);
+ Y_i=X_i.*M_i./MWmix;
+end
+
+end
+
+
+

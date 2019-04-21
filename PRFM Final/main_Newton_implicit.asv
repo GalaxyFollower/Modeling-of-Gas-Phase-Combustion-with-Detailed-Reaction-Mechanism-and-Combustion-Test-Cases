@@ -1,0 +1,436 @@
+clc; clear all;
+
+%% Comment
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Program to compute & plot the change in mass concentration in reactions %
+% with respect to length.                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%                            DEFINITIONS                            %%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% i in parameters denote species and k in parameters denote reactions
+% X_i                   = ith specie molar fraction
+% X_it                  = Species molar concenration over time period
+% Hf_i                  = Heat of formation of specie i (kJ/mol)
+% Y_i                   = Species mass fraction of species
+% M_i                   = Species molecular weight
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%% domain and mesh selection
+lo =.01;                             %length domain                   
+h =.0000007;                         %dx in x direction
+big_h=0.00000007;
+factor = 1;                     %dx increment factor
+c = 1;                               %counter
+cc=1;
+x(1,1) = 0;                               %initial displacement x=0
+output_control=100;
+R=8.3144598;                             %universal gas constant
+
+while(x(1,c)<=lo)
+    if(x(1,c)<0.02);%||x(1,c)>0.0018)
+    x(1,c+1)=x(1,c)+big_h;
+    else
+    x(1,c+1)=x(1,c)+h;
+    end
+    c=c+1;
+end
+c=1;
+while(x(1,c)<=lo)
+    if(x(1,c)>0.02);%&&(x(1,c)<0.002))
+    flue_func(1,c) = 1; 
+    else
+    flue_func(1,c) = 0; 
+    end
+    c=c+1;
+end
+c=1;
+
+%rho_t = zeros(1,n);     %density of mixture
+%Cp_t = zeros(1,n);      %specific heat capacity of mixture
+%Vx_t = zeros(1,n);      %velocity in x direction
+%T_t = zeros(1,n);       %temperature in Kelvin
+%P_t = zeros(1,n);       %pressure in SI units
+%Tr_t = zeros(1,n);      %residence time in seconds
+
+
+%% input from preprocessor
+[Y_i,M_i,vr,vp,Arf_k,nf_k,Ef_k,a,temp,reaction,react_matrix,prod_matrix,rev,third_body,third_body_matrix,...
+reaction_order_matrix,reverse_reaction_order_matrix,no_of_reactions,species] = preprocessor();
+% [i,Y_i,M_i,Cp_i,Hf_i,vr,vp] = reactioninput();
+%Y_i_t = zeros(i,n);    %species mass fraction
+
+%% Thermodynamic Data and Reaction Rate Plots
+preplots=0;
+if preplots==1
+Rcgs=1.998154; %data in cgs units to compare with CHEMKIN
+preprocessor_plots(reaction,species,a,temp,react_matrix,prod_matrix,rev,Rcgs);
+end
+
+%% initial conditions
+T_X(1,1) = 1200;%1215.417693;%1970.65;%2265.464;%438.83;%2510;%
+P_X(1,1) = 295000;
+Vx_X(1,1) = 10;%8.71149313;%40.188;%27.343;%77.43067;%112.13;%
+tr_X(1,1) = 0;
+Y_i_X(:,1) = Y_i;
+
+%% lateral flue conditions
+Y_i_lateral = [0;0;2.3292e-001;0;0;0;0;0;7.6708e-001]; %lateral flue mass fraction
+T_lateral = 600;                   %lateral mass flux tempr
+P_lateral = 295000;               %lateral mass flux pressure
+% V_lateral = 60;                    %lateral mass flux velocity
+d_ft=0.080;
+peri = pi*d_ft;                       %perimeter of reactor's cross section
+CS_area = pi*d_ft^2/4;                %CS area of reactor
+[Cp_i,H_i,S_i]=nasa(a,temp,T_lateral,R);
+Cp_lateral = sum(Y_i_lateral.*Cp_i);
+[rho_lateral,rho_i_lateral,X_i_lateral] = masstomole(T_lateral,P_lateral,Y_i_lateral,M_i);
+Area_dillution=pi/4*((d_ft/0.7)^2-d_ft^2);
+mass_flow_dillution(1,1)=.3;0.2808; 
+V_lateral=mass_flow_dillution/Area_dillution/rho_lateral;
+hL = Cp_lateral * T_lateral + 0.5*V_lateral^2;       %enthalpy carried by lateral mass flux
+
+mass_flow_injection(1,1)=0;
+mass_injection(1,1)=mass_flow_injection(1,1);
+mass_flow_for_dillution(1,1)=mass_flow_dillution(1,1);
+
+%% mass flux injection coordinates
+
+mL = rho_lateral * V_lateral * flue_func(1,2);
+mL_species = rho_i_lateral * V_lateral *flue_func(1,2);
+
+%% wall heat condition
+heat_coeff = .000;                  %wall heat coeff >>>>>>>> Q_flux = heat_coeff * (T-T_infinity)
+T_infinity = T_lateral;
+
+%% 
+distance(1,1) = 0;
+interval(1,1) = h;
+guess=0;
+loop=1
+g=1
+norm_prev = 1e10;
+[r ~]=size(Y_i_X(:,1));
+r
+
+% molar fraction and density from mass fraction and molecular weight
+[rho_X(1,1),rho_i,X_i] = masstomole(T_X(1,1),P_X(1,1),Y_i_X(:,1),M_i); 
+rho_prev=rho_X(1,1);
+X_i_X(:,loop) = X_i;
+
+    T_prev=T_X(1,1);
+    Y_i_prev=Y_i_X(:,1);
+    P_prev=P_X(1,1);
+    Vx_prev=Vx_X(1,1);
+    tr_prev=tr_X(1,1);
+    output_x=2;
+    
+%% iteration starts>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+while (x(1,c+1) < lo)   
+
+%%  Initial Guess Value 
+
+    if(guess==0)
+    T_x = T_prev;
+    rho_x=rho_prev;
+    Y_i_x = Y_i_prev;
+    P_x = P_prev;
+    Vx_x = Vx_prev;
+    tr_x = tr_prev;
+    end
+    
+%      T_x = T_x
+%     rho_x=rho_x
+%     Y_i_x = Y_i_prev;
+%     P_x = P_x
+%     Vx_x = Vx_prev;
+%     tr_x = tr_prev;
+%%
+% molar fraction and density from mass fraction and molecular weight
+[~,rho_i,~] = masstomole(T_x,P_x,Y_i_x,M_i);   
+    
+%% production by chemical reaction
+[w_i,Cp_i,H_i,kf] = production_i(T_x,P_x,rho_i,M_i,vr,vp,Arf_k,nf_k,Ef_k,a,temp,react_matrix,prod_matrix,rev,third_body,third_body_matrix,no_of_reactions);
+Cp_i=Cp_i./M_i;
+H_i=H_i./M_i;
+Cp_x = sum(Y_i_x.*Cp_i);                                  
+MWmix = (sum(Y_i_x./M_i))^-1;          %mixture molecular weight
+
+QL = heat_coeff * (T_x-T_lateral);
+m = rho_x*Vx_x*CS_area;
+    
+
+    
+%%  Newtons Method solution starts
+    h=x(1,c+1)-x(1,c);
+
+    %% %%%%%%%%%%%%%% assigning jacobian matrix %%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    jacobian = eye(3+r);
+    k=1e-3;
+    if(abs(rho_x)>1)
+        e_rho = abs(rho_x)*k;
+    else
+        e_rho = k;
+    end
+    
+    if(abs(T_x)>1)
+        e_T = abs(T_x)*k;
+    else
+        e_T = k;
+    end
+    
+    if(abs(tr_x)>1)
+        e_tr = abs(tr_x)*k;
+    else
+        e_tr = k;
+    end
+    
+    e_Yi(:,1) = k;
+    
+    [func_Y_i_1,~] = species_con_function(h,Y_i_x,rho_x+e_rho,Vx_x,M_i,w_i,mL_species,m,peri,Y_i_prev);
+    [func_Y_i_2,dY_i_dx] = species_con_function(h,Y_i_x,rho_x,Vx_x,M_i,w_i,mL_species,m,peri,Y_i_prev);
+    jacobian(4:r+3,1)= (func_Y_i_1 - func_Y_i_2) / e_rho;
+    
+    
+    [func_Y_i_11,~] = species_con_function(h,Y_i_x+e_Yi(:,1),rho_x,Vx_x,M_i,w_i,mL_species,m,peri,Y_i_prev);
+%     func_Y_i_2 = species_con_function(h,Y_i_x,rho_x,Vx_x,M_i,w_i,Y_i_prev);
+    jacobian(4:r+3,4:r+3) = diag((func_Y_i_11 - func_Y_i_2) ./ e_Yi(:,1));
+       
+        
+    [func_rho_1,~] = density_function(h,rho_x+e_rho,Vx_x,Cp_x,MWmix,M_i,T_x,H_i,dY_i_dx,mL,m,hL,QL,peri,rho_prev);
+    [func_rho_2,drho_dx] = density_function(h,rho_x,Vx_x,Cp_x,MWmix,M_i,T_x,H_i,dY_i_dx,mL,m,hL,QL,peri,rho_prev);
+    jacobian(1,1)= (func_rho_1 - func_rho_2) / e_rho;
+    
+    
+    [func_rho_11,~] = density_function(h,rho_x,Vx_x,Cp_x,MWmix,M_i,T_x+e_T,H_i,dY_i_dx,mL,m,hL,QL,peri,rho_prev);
+%     func_rho_2 = density_function(h,rho_x,Vx_x,Cp_x,MWmix,M_i,T_x,H_i,w_i,rho_prev);
+    jacobian(1,2)= (func_rho_11 - func_rho_2) / e_T;
+    
+    func_T_1 = temperature_function(h,rho_x+e_rho,T_x,Vx_x,Cp_x,H_i,dY_i_dx,mL,m,hL,QL,peri,T_prev,drho_dx);
+    func_T_2 = temperature_function(h,rho_x,T_x,Vx_x,Cp_x,H_i,dY_i_dx,mL,m,hL,QL,peri,T_prev,drho_dx);
+    jacobian(2,1)= (func_T_1 - func_T_2) / e_rho;
+    
+    func_T_11 = temperature_function(h,rho_x,T_x+e_T,Vx_x,Cp_x,H_i,dY_i_dx,mL,m,hL,QL,peri,T_prev,drho_dx);
+%     func_T_2 = temperature_function(h,rho_x,T_x,Vx_x,Cp_x,MWmix,M_i,H_i,w_i,T_tprev);
+    jacobian(2,2)= (func_T_11 - func_T_2) / e_T;
+    
+    
+    func_tr_1 = residencetime_function(h,tr_x+e_tr,Vx_x,tr_prev);
+    func_tr_2 = residencetime_function(h,tr_x,Vx_x,tr_prev);
+    jacobian(3,3)= (func_tr_1 - func_tr_2) / e_tr;
+    
+    
+    
+    %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+%     del_matrix = zeros(4,1);
+    func_matrix(1,1) = - func_rho_2;
+    func_matrix(2,1) = - func_T_2;
+    func_matrix(3,1) = - func_tr_2;
+    func_matrix(4:r+3,1) = - func_Y_i_2;
+    
+%     calculate
+
+    del_matrix = gauss_elimination ( jacobian, func_matrix )';
+    norm=0;
+    
+    for (y=1:r+3)
+    norm =  norm+abs(func_matrix(y,1));
+    end
+    
+    if(norm > norm_prev)
+        del_matrix = del_matrix/5;
+    end
+    norm_prev = norm;
+    norm;
+    
+%% for next step 
+
+%     rho_prev=rho_x;
+%     T_prev=T_x;
+%     tr_prev=tr_x;
+%     Y_i_prev=Y_i_x;
+    
+    rho_x = rho_x + del_matrix(1,1);
+    T_x = T_x + del_matrix(2,1);
+    tr_x = tr_x + del_matrix(3,1);
+    Y_i_x = Y_i_x + del_matrix(4:r+3,1);
+
+% for(i=1:r)
+%     
+% if(Y_i_t(i,c+1)<0)
+%    Y_i_t(i,c+1) =0;
+% end
+% end
+    
+    
+    MWmix = (sum(Y_i_x./M_i))^-1;
+    P_x = rho_x*T_x*R/MWmix;                    %ideal gas equation
+    Vx_x = ((rho_prev*Vx_prev)+(mL*peri*h/CS_area))/rho_x;                  %continuty equation
+    guess=1;
+    c;
+    
+    %%
+    T_t_lat(1,c)=T_lateral;
+%     T_lateral=heat_coeff*(T_x-T_lateral)/(rho_lateral * V_lateral*Cp_lateral)+T_lateral;
+    mass_flow_injection(1,c+1)=mass_flow_injection(1,c)+mL*peri*h;
+    mass_flow_dillution(1,c+1)=mass_flow_dillution(1,c)-mL*peri*h;
+%     mL_previous = mass_flow_dillution(1,c+1)/Area_dillution;
+    mL_previous = mass_flow_dillution(1,1)/Area_dillution;
+    [Cp_i,H_i,S_i]=nasa(a,temp,T_lateral,R);
+    Cp_lateral = sum(Y_i_lateral.*Cp_i);
+    [rho_lateral,rho_i_lateral,X_i_lateral] = masstomole(T_lateral,P_lateral,Y_i_lateral,M_i);
+    V_lateral=mL_previous/rho_lateral;
+    mL = rho_lateral * V_lateral * flue_func(1,c+1);
+    mL_species = rho_i_lateral * V_lateral *flue_func(1,c+1);
+    hL = Cp_lateral * T_lateral + 0.5*V_lateral^2;        %enthalpy carried by lateral mass flux
+    
+%% iteration condition
+   
+    if((abs(del_matrix(2,1)/T_x))<=1e-13)||g>4
+        
+        if(c/output_control==output_x)
+    [Cp_i,H_i,S_i]=nasa(a,temp,T_x,R);
+    Cp_i(:,output_x)=Cp_i./M_i;
+    H_i(:,output_x)=H_i./M_i;
+    Cp_X(output_x,1) = sum(Y_i_x.*Cp_i(:,output_x));
+    
+    rho_X(output_x,1)=rho_x;
+    T_X(output_x,1)=T_x;
+    tr_X(output_x,1)=tr_x;
+    Y_i_X(:,output_x)=Y_i_x;   
+    P_X(output_x,1)=P_x;
+    Vx_X(output_x,1)=Vx_x;
+    MWmix_X(output_x,1)=MWmix;
+    w_i_X(:,output_x)=w_i;
+    mass_injection(output_x,1)=mass_flow_injection(1,c+1);
+    mass_flow_for_dillution(output_x,1)=mass_flow_dillution(1,c+1);
+    
+    T_total(1,output_x)=T_x+(Vx_x^2)/(2*Cp_X(output_x,1));
+    X_i_X(:,output_x)=(Y_i_x./M_i)*MWmix;
+    distance(1,output_x) = x(1,c);
+    interval(1,output_x) = h;
+    output_x=output_x + 1;
+        end
+        
+    rho_prev=rho_x;
+    T_prev=T_x;
+    tr_prev=tr_x;
+    Y_i_prev=Y_i_x;   
+    P_prev=P_x;
+    Vx_prev=Vx_x;
+    guess=0;
+    g=0;
+    c = c+1
+    end
+    
+    g=g+1;
+    loop=loop+1
+% if(loop==10)
+%     return
+% end
+% if(c>100)
+% if(w_i_t(1,c)==0)
+%      break
+% end
+% end
+length=x(1,c)
+end
+
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PLOTS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%distance = (0:h:lo);
+figure(1)
+plot(distance,rho_X,'k','LineWidth',2)
+xlabel('Length(m)')
+ylabel('Mass density (kg/m^3) ')
+title('\bf Mass density')
+
+
+figure(2)
+plot(distance,T_X,'k','LineWidth',2)
+xlabel('Length(m)')
+ylabel('Temperature (K)')
+title('\bf Temperature')
+
+figure(3)
+plot(distance,Vx_X,'k','LineWidth',2)
+xlabel('Length(m)')
+ylabel('Velocity (m/s)')
+title('\bf Velocity')
+
+figure(4)
+plot(distance,P_X,'k','LineWidth',2)
+xlabel('Length(m)')
+ylabel('Pressure (Pa)')
+title('\bf Pressure')
+
+figure(5)
+% axes1 = axes('Parent',figure(100));
+plot1=plot(distance,X_i_X,'LineWidth',2);
+for i=1:r
+set(plot1(i),'DisplayName',species(i).species);
+end
+xlabel('Length(m)');
+ylabel('Species Molar Fraction');
+title('\bf Finite Rate Reaction Progression');
+legend1 = legend('show');
+set(legend1,'Location','best');
+
+% figure(6)
+% plot(distance,tr_t,'k','LineWidth',2)
+% xlabel('Length(m)')
+% ylabel('Residence time (s)')
+% title('Residence time')
+
+% figure(7)
+% plot1=plot(distance,Y_i_X);
+% xlabel('Length (m)')
+% ylabel('Species Mass Fraction')
+% title('Finite Rate Reaction Progression')
+% % set(plot1(1),'DisplayName','H2','LineWidth',2,'LineStyle','.');
+% % set(plot1(2),'DisplayName','O2','LineWidth',2,'LineStyle','.',...
+% %     'Color',[0 0 0]);
+% % set(plot1(3),'DisplayName','H2O','LineWidth',2,'LineStyle','.',...
+% %     'Color',[0 0 0]);
+% % set(plot1(4),'DisplayName','N2','LineWidth',2,'LineStyle','.');
+% 
+
+figure(8)
+plot2=plot(distance,w_i_X,'LineWidth',2);
+for i=1:r
+set(plot2(i),'DisplayName',species(i).species);
+end
+xlabel('Length(m)')
+ylabel('Rate (mol/m^3-s)')
+title('\bf Species Producation Rate')
+legend1 = legend('show');
+set(legend1,'Location','best');
+
+figure(9)
+plot(distance,mass_injection,'k','LineWidth',2)
+xlabel('Length(x)')
+ylabel('mass flow injected (kg/sec)')
+title('\bf Mass Flow Injection')
+
+figure(10)
+plot(distance,mass_flow_for_dillution,'k','LineWidth',2)
+xlabel('Length(x)')
+ylabel('mass flow dillution (kg/sec)')
+title('\bf Mass Flow Dillution')
+
+figure(11)
+plot(distance,T_total,'k','LineWidth',2)
+xlabel('Length(m)')
+ylabel('Total Temperature (K)')
+title('\bf Total Temperature')
+
+%% end
+
+
+
+

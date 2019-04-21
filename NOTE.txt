@@ -1,0 +1,7 @@
+For changing reaction mechanism, change the contents of "chem.inp" file.
+
+Thermochemical data are in "therm.dat" file.
+
+Reaction mechanism format exact as CHEMKIN format for normal reaction mechanism with third body
+efficiencies.
+

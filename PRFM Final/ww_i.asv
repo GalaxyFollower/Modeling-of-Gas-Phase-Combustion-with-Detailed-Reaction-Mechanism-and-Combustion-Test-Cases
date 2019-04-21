@@ -1,0 +1,81 @@
+
+function [w_i,cp_i,H_i,kff,k] = ww_i(c,Tt,rho_i,M_i,vr,vp,Arf,nf,Ef,a,temp,reaction,react_matrix,prod_matrix,P)
+
+
+ R=8.310;                        %J/mol K
+
+
+% %% Initializing all values to zero   
+% Net_Q1(1,1)=0;
+% NetQ1(1,1)=0;
+% NetQ=0;
+
+X_iconc = (rho_i./M_i)*10e-6;
+
+[cp_i,H_i,S_i]=nasa(a,temp,Tt,R);
+
+
+%% Average molar mass
+% M_avg=sum(X_iconc.*M_i)/sum(X_iconc);
+
+% %% Initial volume
+% volume1(1,count)=(M_avg/1000)/density(1,count);
+% volume=volume1(1,count);
+
+%% Forward Reaction Rate Constant
+    kf=(Arf.*power(Tt,nf).*exp(-(Ef./(R*Tt))));
+       
+%% For Backward Reaction Rate Constant 
+
+    %sum of Enthalpy of reactant species of each reaction at given temp
+    del_H_i_reactant=react_matrix*H_i;
+    
+%Alternative of above step   
+% q=size(react_matrix)
+% for i=1:q(1)
+% del(:,i)=H_i.*vp(:,i);
+% end
+% sum_del=sum(del)
+    
+    %sum of Enthalpy of product species of each reaction at given temp
+    del_H_i_product=prod_matrix*H_i;
+       
+    %sum of Entropy of reactant species of each reaction at given temp
+    del_S_i_reactant=react_matrix*S_i;
+    
+    %sum of Entropy of product species of each reaction at given temp
+    del_S_i_product=prod_matrix*S_i;
+   
+    % Gibb's free energy of the species of a reaction
+    del_G=del_H_i_product-del_H_i_reactant-Tt*(del_S_i_product-del_S_i_reactant);
+    
+    % Equilibrium constant
+    Kc=((P/(R*Tt)).^sum(prod_matrix-react_matrix,2)).*exp(-del_G/(R*Tt));    
+    
+    % Backward Reaction Rate Constant
+    kb=kf./Kc;
+    
+    kf=kf';
+    kb=kb';
+    
+%%  Rate of Progress Variable(q_i)
+    size_of_rxn_matrix=size(react_matrix);
+    progress_i_react=zeros(size_of_rxn_matrix)';
+    progress_i_prod=zeros(size(prod_matrix))';
+    for i=1:size_of_rxn_matrix(1)  
+      progress_i_react(:,i)=power(X_iconc,vr(:,i));
+      progress_i_prod(:,i)=power(X_iconc,vp(:,i));
+    end
+    q_i=kf.*prod(progress_i_react)%-kb.*prod(progress_i_prod);
+    
+    kff(c,1)=kf;
+    krr(c,1)=kb;
+
+  
+%% Production Rate (w_i)
+     w_i=q_i*(prod_matrix-react_matrix);  % mol/cm^3-s
+     w_i=w_i'*10e6
+     
+     
+end
+     
