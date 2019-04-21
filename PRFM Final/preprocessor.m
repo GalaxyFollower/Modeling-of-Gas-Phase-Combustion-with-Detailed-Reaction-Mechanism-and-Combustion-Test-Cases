@@ -74,7 +74,7 @@ unbalanced_prod_matrix,rev,third_body,third_body_matrix,...
 reaction_order_matrix,reverse_reaction_order_matrix]=rxndata;
 end
 
-Arf_k=[reaction(:).Arf]'
+Arf_k=[reaction(:).Arf]';
 nf_k=[reaction(:).nf]';
 Ef_k=[reaction(:).Ef]'.*4.184;
 

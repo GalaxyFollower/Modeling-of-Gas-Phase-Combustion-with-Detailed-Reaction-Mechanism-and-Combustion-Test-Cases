@@ -1,12 +1,13 @@
 function [coeff,ttemp,no_of_elements] = thermodat(spcs,elements)
 
 %%opening file 'thermo.dat'%%
-fid = fopen('thermo.dat', 'r' );
+fid = fopen('thermo.DAT', 'r' );
 
 
 %% File Opening Check
 if fid == -1
 disp('thermo.dat File open not successful')
+error('thermo.DAT not found')
 else
 disp('thermo.dat File open successful')
 
